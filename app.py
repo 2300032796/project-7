@@ -1,51 +1,148 @@
+import os
+import tempfile
 import streamlit as st
 
-from auth import login
-from rag import index_pdf, ask_question
+from langchain_chroma import Chroma
+from langchain_groq import ChatGroq
 
-st.set_page_config(
-    page_title="Healthcare RAG Assistant",
-    page_icon="🏥",
-    layout="wide"
+from langchain_huggingface import HuggingFaceEmbeddings
+
+from langchain_community.document_loaders import PyPDFLoader
+
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+
+from langchain_core.prompts import ChatPromptTemplate
+
+from langchain.chains.combine_documents import create_stuff_documents_chain
+
+from langchain.chains import create_retrieval_chain
+
+CHROMA_PATH = "chroma_db"
+
+embeddings = HuggingFaceEmbeddings(
+    model_name="sentence-transformers/all-MiniLM-L6-v2"
 )
 
-login()
-
-st.title("🏥 Healthcare Coding Assistant")
-
-uploaded = st.file_uploader(
-    "Upload Healthcare PDF",
-    type=["pdf"]
+llm = ChatGroq(
+    api_key=st.secrets["GROQ_API_KEY"],
+    model="llama3-8b-8192",
+    temperature=0
 )
 
-if uploaded:
+prompt = ChatPromptTemplate.from_template(
+"""
+You are a healthcare coding assistant.
 
-    if st.button("Index Document"):
+Use ONLY the provided context.
 
-        with st.spinner("Indexing PDF..."):
+If the answer is not available in the context,
+reply with
 
-            index_pdf(uploaded)
+"I don't know."
 
-        st.success("Document Indexed Successfully")
+<context>
 
-question = st.text_area(
-    "Ask a Medical Question"
+{context}
+
+</context>
+
+Question:
+
+{input}
+"""
 )
 
-if st.button("Generate Answer"):
+def index_pdf(uploaded_file):
 
-    if question.strip() == "":
-        st.warning("Enter a question")
-        st.stop()
+    if os.path.exists(CHROMA_PATH):
 
-    answer, sources = ask_question(question)
+        import shutil
 
-    st.subheader("Answer")
+        shutil.rmtree(CHROMA_PATH)
 
-    st.write(answer)
+    with tempfile.NamedTemporaryFile(
+        delete=False,
+        suffix=".pdf"
+    ) as tmp:
 
-    st.subheader("Evidence")
+        tmp.write(uploaded_file.read())
 
-    for source in sources:
+        pdf_path = tmp.name
 
-        st.info(source)
+    loader = PyPDFLoader(pdf_path)
+
+    docs = loader.load()
+
+    splitter = RecursiveCharacterTextSplitter(
+
+        chunk_size=700,
+
+        chunk_overlap=100
+
+    )
+
+    chunks = splitter.split_documents(docs)
+
+    Chroma.from_documents(
+
+        documents=chunks,
+
+        embedding=embeddings,
+
+        persist_directory=CHROMA_PATH
+
+    )
+
+def ask_question(question):
+
+    db = Chroma(
+
+        persist_directory=CHROMA_PATH,
+
+        embedding_function=embeddings
+
+    )
+
+    retriever = db.as_retriever(
+
+        search_kwargs={"k":3}
+
+    )
+
+    document_chain = create_stuff_documents_chain(
+
+        llm,
+
+        prompt
+
+    )
+
+    chain = create_retrieval_chain(
+
+        retriever,
+
+        document_chain
+
+    )
+
+    response = chain.invoke({
+
+        "input": question
+
+    })
+
+    answer = response["answer"]
+
+    evidence = []
+
+    for doc in response["context"]:
+
+        page = doc.metadata.get("page",0)
+
+        evidence.append(
+
+            f"Page {page+1}: {doc.page_content[:300]}..."
+
+        )
+
+    return answer,evidence
