@@ -2,13 +2,11 @@ streamlit
 langchain
 langchain-community
 langchain-core
+langchain-text-splitters
 langchain-huggingface
+langchain-groq
 chromadb
 sentence-transformers
-transformers
-torch
 pypdf
 pandas
 plotly
-accelerate
-huggingface-hub
