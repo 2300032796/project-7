@@ -1,8 +1,8 @@
 import streamlit as st
 
-# -----------------------------
+# ------------------------------------
 # Demo Users
-# -----------------------------
+# ------------------------------------
 
 USERS = {
     "doctor": {
@@ -19,26 +19,27 @@ USERS = {
     }
 }
 
-# -----------------------------
-# Login Function
-# -----------------------------
+# ------------------------------------
+# Login
+# ------------------------------------
 
 def login():
 
     if "logged_in" not in st.session_state:
         st.session_state.logged_in = False
 
-    if "role" not in st.session_state:
-        st.session_state.role = None
+    if "user_role" not in st.session_state:
+        st.session_state.user_role = ""
 
     if st.session_state.logged_in:
+        show_sidebar()
         return
 
     st.sidebar.title("🔐 Login")
 
     username = st.sidebar.selectbox(
         "Username",
-        list(USERS.keys())
+        USERS.keys()
     )
 
     password = st.sidebar.text_input(
@@ -51,39 +52,31 @@ def login():
         if USERS[username]["password"] == password:
 
             st.session_state.logged_in = True
-            st.session_state.role = USERS[username]["role"]
-
-            st.sidebar.success("Login Successful")
+            st.session_state.user_role = USERS[username]["role"]
 
             st.rerun()
 
         else:
 
-            st.sidebar.error("Invalid Username or Password")
+            st.sidebar.error("Invalid Password")
 
     st.stop()
 
-# -----------------------------
-# Logout Button
-# -----------------------------
+# ------------------------------------
+# Sidebar
+# ------------------------------------
 
-def logout():
+def show_sidebar():
+
+    st.sidebar.success(
+        f"Logged in as {st.session_state.user_role}"
+    )
+
+    st.sidebar.divider()
 
     if st.sidebar.button("Logout"):
 
         st.session_state.logged_in = False
-        st.session_state.role = None
+        st.session_state.user_role = ""
 
         st.rerun()
-
-# -----------------------------
-# Display Current User
-# -----------------------------
-
-def show_user():
-
-    if st.session_state.logged_in:
-
-        st.sidebar.success(
-            f"Logged in as: {st.session_state.role}"
-        )
