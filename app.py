@@ -1,7 +1,7 @@
 import streamlit as st
 from rag import build_vectorstore, ask_question
 from guardrails import check_prompt_injection
-from auth import login
+from auth import login, logout, show_user
 
 st.set_page_config(
     page_title="Healthcare RAG Assistant",
@@ -12,6 +12,8 @@ st.set_page_config(
 # ---------------- LOGIN ----------------
 
 login()
+show_user()
+logout()
 
 # ---------------- TITLE ----------------
 
